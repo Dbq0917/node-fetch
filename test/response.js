@@ -1,6 +1,6 @@
 import * as stream from 'node:stream';
 import chai from 'chai';
-import {Response, Blob} from '../src/index.js';
+import {Response, Blob, Headers} from '../src/index.js';
 import TestServer from './utils/server.js';
 
 const {expect} = chai;
@@ -39,6 +39,7 @@ describe('Response', () => {
 			'redirected',
 			'statusText',
 			'headers',
+			'trailer',
 			'clone'
 		]) {
 			expect(enumerableProperties).to.contain(toCheck);
@@ -75,6 +76,22 @@ describe('Response', () => {
 			}
 		});
 		expect(res.headers.get('a')).to.equal('1');
+	});
+
+	it('should resolve trailer to an empty Headers object by default', async () => {
+		const res = new Response('a=1');
+		const trailers = await res.trailer;
+		expect(trailers).to.be.instanceOf(Headers);
+		expect([...trailers.entries()]).to.deep.equal([]);
+	});
+
+	it('should share the trailer promise through clone()', async () => {
+		const trailer = Promise.resolve(new Headers({'x-checksum': 'abc'}));
+		const res = new Response('a=1', {trailer});
+		const cloned = res.clone();
+
+		expect(await cloned.trailer).to.equal(await res.trailer);
+		expect((await cloned.trailer).get('x-checksum')).to.equal('abc');
 	});
 
 	it('should decode responses containing BOM to json', async () => {

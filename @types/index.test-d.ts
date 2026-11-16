@@ -34,6 +34,10 @@ async function run() {
 	// Headers iterable
 	expectType<Headers>(getResponse.headers);
 
+	// Trailer resolves to a Headers object
+	expectType<Promise<Headers>>(getResponse.trailer);
+	expectType<Headers>(await getResponse.trailer);
+
 	// Post
 	try {
 		const request = new Request('http://byjka.com/buka');

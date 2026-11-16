@@ -2308,6 +2308,102 @@ describe('node-fetch', () => {
 
 		expect(response2.headers.get('content-type')).to.equal('text/plain');
 	});
+
+	describe('response trailer', () => {
+		it('should expose trailers by name and match the server values', async () => {
+			const expectedChecksum = crypto.randomBytes(16).toString('hex');
+			const expectedDuration = '12';
+			const url = local.mockResponse(res => {
+				res.writeHead(200, {
+					'Content-Type': 'text/plain',
+					'Transfer-Encoding': 'chunked',
+					Trailer: 'X-Checksum, X-Duration'
+				});
+				res.write('chunk-1');
+				res.write('chunk-2');
+				res.addTrailers({
+					'X-Checksum': expectedChecksum,
+					'X-Duration': expectedDuration
+				});
+				res.end();
+			});
+
+			const response = await fetch(url);
+			expect(await response.text()).to.equal('chunk-1chunk-2');
+
+			const trailers = await response.trailer;
+			expect(trailers).to.be.instanceOf(Headers);
+			expect(trailers.get('x-checksum')).to.equal(expectedChecksum);
+			expect(trailers.get('X-Checksum')).to.equal(expectedChecksum);
+			expect(trailers.get('x-duration')).to.equal(expectedDuration);
+		});
+
+		it('should resolve to an empty Headers object without throwing when there are no trailers', async () => {
+			const url = local.mockResponse(res => {
+				res.statusCode = 200;
+				res.setHeader('Content-Type', 'text/plain');
+				res.end('no trailers here');
+			});
+
+			const response = await fetch(url);
+			expect(await response.text()).to.equal('no trailers here');
+
+			const trailers = await response.trailer;
+			expect(trailers).to.be.instanceOf(Headers);
+			expect(trailers.get('x-checksum')).to.be.null;
+			expect([...trailers.entries()]).to.deep.equal([]);
+		});
+
+		it('should not block body consumption before the trailer arrives', async () => {
+			const url = local.mockResponse(res => {
+				res.writeHead(200, {
+					'Content-Type': 'text/plain',
+					'Transfer-Encoding': 'chunked',
+					Trailer: 'X-Checksum'
+				});
+				res.write('first');
+				setTimeout(() => {
+					res.addTrailers({'X-Checksum': 'late-checksum'});
+					res.end('second');
+				}, 50);
+			});
+
+			const response = await fetch(url);
+			const body = await response.text();
+			expect(body).to.equal('firstsecond');
+
+			const trailers = await response.trailer;
+			expect(trailers.get('x-checksum')).to.equal('late-checksum');
+		});
+
+		it('should keep already received trailers available when the body is interrupted', async () => {
+			const url = local.mockResponse(res => {
+				res.socket.write(
+					'HTTP/1.1 200\r\n' +
+					'Transfer-Encoding: chunked\r\n' +
+					'Trailer: X-Checksum\r\n' +
+					'\r\n' +
+					'5\r\nhello\r\n' +
+					'0\r\n' +
+					'X-Checksum: aborted-checksum\r\n' +
+					'\r\n'
+				);
+				setTimeout(() => {
+					res.socket.end();
+				}, 100);
+			});
+
+			const response = await fetch(url);
+
+			// Wait until the trailers have been parsed, then interrupt the stream
+			// while the underlying socket is still open.
+			const trailers = await response.trailer;
+			response.body.destroy();
+
+			expect(trailers.get('x-checksum')).to.equal('aborted-checksum');
+			expect((await response.trailer).get('x-checksum')).to.equal('aborted-checksum');
+		});
+	});
 });
 
 describe('node-fetch using IPv6', () => {

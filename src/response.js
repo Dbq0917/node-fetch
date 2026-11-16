@@ -41,6 +41,7 @@ export default class Response extends Body {
 			status,
 			statusText: options.statusText || '',
 			headers,
+			trailer: options.trailer || Promise.resolve(new Headers()),
 			counter: options.counter,
 			highWaterMark: options.highWaterMark
 		};
@@ -77,6 +78,17 @@ export default class Response extends Body {
 		return this[INTERNALS].headers;
 	}
 
+	/**
+	 * A promise resolving to a Headers object holding the HTTP trailer
+	 * fields received after the response body. Resolves to an empty Headers
+	 * object when the response carries no trailers. Never rejects.
+	 *
+	 * @returns {Promise<Headers>}
+	 */
+	get trailer() {
+		return this[INTERNALS].trailer;
+	}
+
 	get highWaterMark() {
 		return this[INTERNALS].highWaterMark;
 	}
@@ -95,6 +107,7 @@ export default class Response extends Body {
 			headers: this.headers,
 			ok: this.ok,
 			redirected: this.redirected,
+			trailer: this.trailer,
 			size: this.size,
 			highWaterMark: this.highWaterMark
 		});
@@ -156,5 +169,6 @@ Object.defineProperties(Response.prototype, {
 	redirected: {enumerable: true},
 	statusText: {enumerable: true},
 	headers: {enumerable: true},
+	trailer: {enumerable: true},
 	clone: {enumerable: true}
 });

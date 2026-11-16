@@ -139,6 +139,24 @@ export default async function fetch(url, options_) {
 			request_.setTimeout(0);
 			const headers = fromRawHeaders(response_.rawHeaders);
 
+			// Node.js parses HTTP/1.1 chunked trailers into `response_.trailers`
+			// once they arrive. Expose them as a spec-compatible
+			// `Response.trailer` promise. The promise never rejects: when there
+			// are no trailers (or the body is interrupted) it resolves with
+			// whatever trailers, if any, have been received so far.
+			const trailer = new Promise(resolve => {
+				const settle = () => {
+					resolve(new Headers(response_.trailers));
+					response_.removeListener('end', settle);
+					response_.removeListener('close', settle);
+					response_.removeListener('error', settle);
+				};
+
+				response_.once('end', settle);
+				response_.once('close', settle);
+				response_.once('error', settle);
+			});
+
 			// HTTP fetch step 5
 			if (isRedirect(response_.statusCode)) {
 				// HTTP fetch step 5.2
@@ -266,6 +284,7 @@ export default async function fetch(url, options_) {
 				status: response_.statusCode,
 				statusText: response_.statusMessage,
 				headers,
+				trailer,
 				size: request.size,
 				counter: request.counter,
 				highWaterMark: request.highWaterMark

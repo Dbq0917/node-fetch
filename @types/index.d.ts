@@ -192,6 +192,12 @@ export class Response extends BodyMixin {
 	readonly statusText: string;
 	readonly type: ResponseType;
 	readonly url: string;
+	/**
+	 * A promise that resolves to the HTTP trailer headers received after the
+	 * response body. Resolves to an empty Headers object when the response
+	 * carries no trailers.
+	 */
+	readonly trailer: Promise<Headers>;
 	clone(): Response;
 
 	static error(): Response;

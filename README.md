@@ -682,10 +682,6 @@ In most cases, directly `fetch(url, options)` is simpler than creating a `Reques
 
 An HTTP(S) response. This class implements the [Body](#iface-body) interface.
 
-The following properties are not implemented in node-fetch at this moment:
-
-- `trailer`
-
 #### new Response([body[, options]])
 
 <small>_(spec-compliant)_</small>
@@ -714,6 +710,18 @@ Convenience property representing if the request has been redirected at least on
 <small>_(deviation from spec)_</small>
 
 Convenience property representing the response's type. node-fetch only supports `'default'` and `'error'` and does not make use of [filtered responses](https://fetch.spec.whatwg.org/#concept-filtered-response).
+
+#### response.trailer
+
+A `Promise` resolving to a [`Headers`](#class-headers) object containing the HTTP trailer fields (for example a checksum) that the server sends after the response body, commonly on a chunked transfer. The promise does not block body consumption and resolves once the trailers arrive (or once the response ends). It never rejects: responses without trailers resolve to an empty `Headers` object, so callers can always read values directly:
+
+```js
+const response = await fetch('https://example.com/file');
+const body = await response.text();
+
+// Empty when the server sent no trailers; no extra guard needed.
+const checksum = (await response.trailer).get('x-checksum');
+```
 
 <a id="class-headers"></a>
 
